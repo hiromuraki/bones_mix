@@ -56,7 +56,7 @@ def render_video(video_name: str):
             (out_dir / f"3d_kp_rtmpose_to_mhformer.mp4", "3D (MHFormer)"),
             (out_dir / f"3d_kp_rtmpose_to_motionagformer.mp4", "3D (MotionAGFormer)"),
         ],
-        output_video_file=out_dir / f"{video_name}_output.mp4"
+        output_video_file=TEST_OUTPUT_DIR / f"{video_name}_output.mp4"
     )
 
 
