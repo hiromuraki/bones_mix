@@ -11,26 +11,28 @@ import os
 
 
 class MotionAGFormerInferencer(IKeypoints3DInferencer):
-    def __init__(self, config_path: Path, weight_path: Path, window: int) -> None:
+    def __init__(self, config_path: Path, weight_path: Path, window: int, stride: int) -> None:
         super().__init__()
         self.config_path = config_path
         self.weight_path = weight_path
         self.window = window
+        self.stride = stride
 
     def run_3d_keypoints_inference(
         self,
         keypoints_2d: np.ndarray,
         video_width: int,
         video_height: int,
-        stride,
     ) -> np.ndarray:
         total_frames = keypoints_2d.shape[0]
+        model, target_frames = self.__load_motionagformer()
 
         if total_frames <= self.window:
             pad_length = self.window - total_frames
             # 如果视频比 window 帧还短，我们直接在首尾复制 Padding 补齐到 window 帧，通过在末尾重复最后一帧补齐
             padded_2d = np.pad(keypoints_2d, ((0, pad_length), (0, 0), (0, 0)), mode='edge')
             pred_3d = self.__run_3d_inference(
+                model,
                 padded_2d,
                 video_width=video_width,
                 video_height=video_height
@@ -45,12 +47,13 @@ class MotionAGFormerInferencer(IKeypoints3DInferencer):
         weight_counts = np.zeros((total_frames, 1, 1), dtype=np.float32)
 
         # 计算所有窗口的起始索引
-        starts = list(range(0, total_frames - self.window + 1, stride))
+        starts = list(range(0, total_frames - self.window + 1, self.stride))
 
         # 🌟 关键防坑：确保视频的最后一段绝对被覆盖到
         if starts[-1] + self.window < total_frames:
             starts.append(total_frames - self.window)
 
+        print("使用 MotionAGFormer 重建 3D 骨骼...")
         print(f"启动滑动窗口推理: 总帧数 {total_frames}, 将被切分为 {len(starts)} 个区块...")
 
         for start in tqdm(starts, desc="3D 推理进度"):
@@ -61,6 +64,7 @@ class MotionAGFormerInferencer(IKeypoints3DInferencer):
 
             # 送入模型推理 (严格 window 帧进，window 帧出)
             chunk_3d = self.__run_3d_inference(
+                model,
                 chunk_2d,
                 video_width=video_width,
                 video_height=video_height
@@ -70,6 +74,8 @@ class MotionAGFormerInferencer(IKeypoints3DInferencer):
             final_3d[start:end] += chunk_3d
             # 记录该位置被预测的次数
             weight_counts[start:end] += 1
+            
+        print(f"3D 骨骼重建完成: {final_3d.shape}")
 
         # ==========================================
         # 结果融合：对重叠区域取平均值
@@ -138,6 +144,7 @@ class MotionAGFormerInferencer(IKeypoints3DInferencer):
 
     def __run_3d_inference(
         self,
+        model: MotionAGFormer,
         keypoints_2d: np.ndarray,  # shape: [Frames, 17, 3] (x, y, confidence)
         video_width: int = 1920,
         video_height: int = 1080
@@ -146,10 +153,9 @@ class MotionAGFormerInferencer(IKeypoints3DInferencer):
         输入: [Frames, 17, 3] 形状的 H36M 关键点
         输出: [243, 17, 3] 形状的 3D 关键点
         """
-        model, target_frames = self.__load_motionagformer()
         device = next(model.parameters()).device
 
-        frames = keypoints_2d.shape[0]
+        frame_count = keypoints_2d.shape[0]
 
         # ==========================================
         # 步骤 1: 坐标归一化 (还原论文的处理手法)
@@ -171,7 +177,6 @@ class MotionAGFormerInferencer(IKeypoints3DInferencer):
         # ==========================================
         # 步骤 4: 进行前向传播
         # ==========================================
-        print("使用 MotionAGFormer 重建 3D 骨骼...")
         with torch.no_grad():
             output_3d_tensor = model(input_tensor)
 
@@ -181,5 +186,4 @@ class MotionAGFormerInferencer(IKeypoints3DInferencer):
         # [附加] 将 3D 骨盆归零 (由于残差，预测结果可能有微小偏移)
         pred_3d_numpy = pred_3d_numpy - pred_3d_numpy[:, 0:1, :]
 
-        print(f"3D 骨骼重建完成: {pred_3d_numpy.shape}")
         return pred_3d_numpy

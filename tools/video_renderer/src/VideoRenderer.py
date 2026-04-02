@@ -164,16 +164,17 @@ class VideoRenderer:
             # 如果你想画面完全干净，连网格线都不要，可以解除下面这句的注释
             # ax.axis('off')
 
-            # ==========================================
-            # 步骤 4: 提取画布像素并写入 OpenCV
+           # ==========================================
+            # 步骤 4: 提取画布像素并写入 OpenCV (适配 Matplotlib 3.8+)
             # ==========================================
             fig.canvas.draw()
-            # 获取 RGB 图像缓冲
-            img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-            img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+            
+            # 直接获取 RGBA 格式的内存视图并转为 numpy 数组 (形状自动为 H, W, 4)
+            img_rgba = np.asarray(fig.canvas.buffer_rgba())
 
-            # 转换成 OpenCV 需要的 BGR 格式
-            img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            # 直接将 4 通道的 RGBA 转换为 OpenCV 专属的 3 通道 BGR 格式
+            img_bgr = cv2.cvtColor(img_rgba, cv2.COLOR_RGBA2BGR)
+            
             writer.write(img_bgr)
 
         # 释放资源

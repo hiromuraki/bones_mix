@@ -1,3 +1,6 @@
+import cv2
+from tqdm import tqdm
+
 from .share import IKeypoints2DInferencer
 from mmpose.apis import MMPoseInferencer
 from pathlib import Path
@@ -18,25 +21,27 @@ class RTMPoseInferencer(IKeypoints2DInferencer):
         # ================================================
         # 阶段一：使用 MMPose 的 RTMPose-l 模型提取 2D 关键点
         # ================================================
-        # 结果为 Frames -> Persons -> Instances{ kp: [17,2], kp_score: [17,2] }
         input_video = input_video.expanduser().resolve()
         if not input_video.exists():
             raise FileNotFoundError(f"Input video not found: {input_video}")
 
+        # 🌟 优化：利用 OpenCV 提前获取视频总帧数，喂给 tqdm 产生完美进度条
+        cap = cv2.VideoCapture(str(input_video))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.release()
+
         print("正在初始化 RTMPose-l 和 RTMDet-m（首次运行可能需要下载权重）...")
         inferencer = MMPoseInferencer(det_model="rtmdet-m", pose2d="rtmpose-l")
 
-        print(f"开始提取 2D 关键点: {input_video}")
-        # Frames -> Persons -> Instances{ kp: [17,2], kp_score: [17,2] }
+        print(f"开始提取 2D 关键点: {input_video} (共 {total_frames} 帧)")
         frame_predictions: List[List[Dict[str, np.ndarray]]] = []
         result_generator = inferencer(str(input_video), show=False, return_vis=False, save_predictions=False)
 
-        for frame_index, result in enumerate(result_generator, start=1):
+        # 🌟 替换：使用 tqdm 包装生成器，并传入 total_frames
+        for result in tqdm(result_generator, total=total_frames, desc="RTMPose 提取中"):
             frame_predictions.append(RTMPoseInferencer.__extract_instances(result))
-            if frame_index % 30 == 0:
-                print(f"已提取 {frame_index} 帧关键点...")
 
-        print(f"关键点提取完成，总帧数: {len(frame_predictions)}")
+        print(f"关键点提取完成，实际提取帧数: {len(frame_predictions)}")
 
         # ===================================================
         # 阶段2：转化为 [Persons, Frames, 17, 3] 的统一张量格式
