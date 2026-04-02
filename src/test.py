@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).absolute().parent / "MotionAGFormer"))
@@ -8,11 +9,14 @@ if True:
     from core import MotionAGFormerInferencer, RTMPoseInferencer, MHFormerInferencer
     from common import DataConverter, VideoUtils, Serializer
 
+TEST_DATA_DIR = Path(os.getenv("TEST_DATA_DIR", ""))
+TEST_OUTPUT_DIR = Path(os.getenv("TEST_OUTPUT_DIR", ""))
+
 
 def test_inference_pipeline(video_name: str):
-    input_video = Path(f"../sample_data/{video_name}.mp4")
+    input_video = TEST_DATA_DIR / f"{video_name}.mp4"
     video_size = VideoUtils.get_video_size(input_video)
-    out_dir = Path(f"../sample_output/{video_name}")
+    out_dir = TEST_OUTPUT_DIR / f"{video_name}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # ========
@@ -58,8 +62,10 @@ def test_inference_pipeline(video_name: str):
 
 
 v_index = 1
+
+
 while True:
-    if not Path(f"../sample_data/sample_{v_index}.mp4").exists():
+    if not (TEST_DATA_DIR / f"sample_{v_index}.mp4").exists():
         break
     test_inference_pipeline(f"sample_{v_index}")
     v_index += 1

@@ -37,7 +37,13 @@ fi
 # ==========================================
 echo "🚀 CUDA 环境变量配置完毕，正在启动..."
 
-base_dir=$(dirname "$0")
+base_dir=$(pwd)
+
+export TEST_DATA_DIR="$base_dir/sample_data"
+export TEST_OUTPUT_DIR="$base_dir/sample_output"
+
+echo "$TEST_DATA_DIR"
+echo "$TEST_OUTPUT_DIR"
 
 cd "$base_dir/src" && uv run test.py
 cd "$base_dir/tools/video_renderer/src" && uv run test.py

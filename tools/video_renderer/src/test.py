@@ -1,8 +1,12 @@
+import os
 from pathlib import Path
 from typing import Any
 from VideoJoiner import VideoJoiner
 from VideoRenderer import VideoRenderer
 import pickle
+
+TEST_DATA_DIR = Path(os.getenv("TEST_DATA_DIR", ""))
+TEST_OUTPUT_DIR = Path(os.getenv("TEST_OUTPUT_DIR", ""))
 
 
 def load_keypoints(file_path: Path) -> Any:
@@ -13,8 +17,8 @@ def load_keypoints(file_path: Path) -> Any:
 
 
 def render_video(video_name: str):
-    input_video = Path(f"../../sample_data/{video_name}.mp4")
-    out_dir = Path(f"../../sample_output/{video_name}")
+    input_video = TEST_DATA_DIR / f"{video_name}.mp4"
+    out_dir = TEST_OUTPUT_DIR / f"{video_name}"
 
     # 渲染 2D 关键点
     VideoRenderer.render_2d_keypoints(
@@ -58,7 +62,7 @@ def render_video(video_name: str):
 
 v_index = 1
 while True:
-    if not Path(f"../../sample_data/sample_{v_index}.mp4").exists():
+    if not (TEST_DATA_DIR / f"sample_{v_index}.mp4").exists():
         break
     render_video(f"sample_{v_index}")
     v_index += 1
