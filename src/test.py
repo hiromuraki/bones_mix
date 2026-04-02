@@ -61,11 +61,6 @@ def test_inference_pipeline(video_name: str):
     Serializer.save_keypoints_to_pickle(kp_3d_motionagformer, out_dir / "3d_kp_rtmpose_to_motionagformer.pkl")
 
 
-v_index = 1
-
-
-while True:
-    if not (TEST_DATA_DIR / f"sample_{v_index}.mp4").exists():
-        break
-    test_inference_pipeline(f"sample_{v_index}")
-    v_index += 1
+for video_file in TEST_DATA_DIR.glob("*.mp4"):
+    video_name = video_file.stem
+    test_inference_pipeline(video_name)

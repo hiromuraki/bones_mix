@@ -60,9 +60,6 @@ def render_video(video_name: str):
     )
 
 
-v_index = 1
-while True:
-    if not (TEST_DATA_DIR / f"sample_{v_index}.mp4").exists():
-        break
-    render_video(f"sample_{v_index}")
-    v_index += 1
+for video_file in TEST_DATA_DIR.glob("*.mp4"):
+    video_name = video_file.stem
+    render_video(video_name)
