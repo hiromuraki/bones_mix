@@ -1,0 +1,11 @@
+# 原始项目
+/original/
+
+# 示例数据
+/sample_data/
+
+# 示例输出
+/sample_output/
+
+# Python 缓存
+__pycache__/

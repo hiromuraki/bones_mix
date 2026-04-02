@@ -1,0 +1,18 @@
+# PFG (Prompt File Generator) 配置文件
+
+project_name = ""        # 影响输出文件名前缀。若留空，则默认使用当前目录名
+use_gitignore = true     # 是否读取并应用项目中的 .gitignore 规则
+
+# 定义包含项（支持目录、具体文件、以及 * 通配符）
+include = [
+    # "src/",
+    "src/MHFormer/",
+    # "*.md",
+]
+
+# 定义额外的排除项（支持 * 通配符）
+exclude = [
+    # "tests/",
+    # "*.log",
+    # "temp_*.txt"
+]
