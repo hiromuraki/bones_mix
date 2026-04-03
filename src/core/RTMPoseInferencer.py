@@ -15,7 +15,7 @@ class RTMPoseInferencer(IKeypoints2DInferencer):
     输出形状为 [Persons, Frames, 17, 3]，格式为 COCO 的 17 点关键点，其中第三维为 (x, y, confidence)。
     """
 
-    def __init__(self, batch_size: int = 32, device: str = "cuda:0") -> None:
+    def __init__(self, batch_size: int = 64, device: str = "cuda:0") -> None:
         super().__init__()
         self.batch_size = batch_size
 
@@ -36,12 +36,10 @@ class RTMPoseInferencer(IKeypoints2DInferencer):
         if not input_video.exists():
             raise FileNotFoundError(f"Input video not found: {input_video}")
 
-        # 🌟 优化：利用 OpenCV 提前获取视频总帧数，喂给 tqdm 产生完美进度条
         cap = cv2.VideoCapture(str(input_video))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        cap.release()
 
-        print("正在初始化 RTMPose-l 和 RTMDet-m（首次运行可能需要下载权重）...")
+        print("正在初始化 RTMPose-l 和 RTMDet-m...")
         inferencer = MMPoseInferencer(
             det_model="rtmdet-m",
             pose2d="rtmpose-l",
@@ -50,18 +48,44 @@ class RTMPoseInferencer(IKeypoints2DInferencer):
 
         print(f"开始提取 2D 关键点: {input_video} (共 {total_frames} 帧)")
         frame_predictions: List[List[Dict[str, np.ndarray]]] = []
-        result_generator = inferencer(
-            str(input_video),
-            show=False,
-            return_vis=False,
-            save_predictions=False,
-            batch_size=self.batch_size,
-        )
 
-        # 🌟 替换：使用 tqdm 包装生成器，并传入 total_frames
-        for result in tqdm(result_generator, total=total_frames, desc="RTMPose 提取中"):
-            frame_predictions.append(RTMPoseInferencer.__extract_instances(result))
+        # 🌟 核心优化：建立帧缓冲区
+        chunk_size = 128  # 每次让 CPU 攒够 128 帧再喂给 GPU
+        frames_buffer = []
 
+        with tqdm(total=total_frames, desc="RTMPose 提取中") as pbar:
+            while True:
+                ret, frame = cap.read()
+                if ret:
+                    frames_buffer.append(frame)
+
+                # 当缓冲区满，或者视频读到最后一帧时，触发 GPU 批量推理
+                if len(frames_buffer) == chunk_size or (
+                    not ret and len(frames_buffer) > 0
+                ):
+                    # 注意：这里传给 inferencer 的不再是视频路径，而是图片数组列表！
+                    # 这会强行激活 MMPose 的底层 Batching 机制
+                    result_generator = inferencer(
+                        frames_buffer,
+                        show=False,
+                        return_vis=False,
+                        save_predictions=False,
+                        batch_size=self.batch_size,
+                    )
+
+                    for result in result_generator:
+                        frame_predictions.append(
+                            RTMPoseInferencer.__extract_instances(result)
+                        )
+                        pbar.update(1)
+
+                    # 极其重要：处理完后清空缓冲区，释放内存，准备装载下一批
+                    frames_buffer = []
+
+                if not ret:
+                    break
+
+        cap.release()
         print(f"关键点提取完成，实际提取帧数: {len(frame_predictions)}")
 
         # ===================================================
