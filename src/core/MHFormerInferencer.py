@@ -11,7 +11,9 @@ from .share import IKeypoints3DInferencer
 
 
 class MHFormerInferencer(IKeypoints3DInferencer):
-    def __init__(self, weight_path: Path, window: int = 351, device: str = "cuda"):
+    def __init__(
+        self, weight_path: Path, window: int, stride: int, device: str = "cuda"
+    ):
         """
         初始化 MHFormer 模型
         :param weight_path: .pth 权重文件路径
@@ -19,6 +21,7 @@ class MHFormerInferencer(IKeypoints3DInferencer):
         """
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         self.window = window
+        self.stride = stride
 
         # 1. 模拟 argparse 配置构造 args
         args, _ = argparse.ArgumentParser().parse_known_args()
@@ -49,7 +52,9 @@ class MHFormerInferencer(IKeypoints3DInferencer):
         self.joints_left = [4, 5, 6, 11, 12, 13]
         self.joints_right = [1, 2, 3, 14, 15, 16]
 
-    def _infer_chunk(self, chunk_2d: np.ndarray, video_width: int, video_height: int) -> np.ndarray:
+    def _infer_chunk(
+        self, chunk_2d: np.ndarray, video_width: int, video_height: int
+    ) -> np.ndarray:
         """
         对形状为 [Window, 17, 2] 的单一块进行 3D 升维推理 (含 TTA 增强)
         """
@@ -59,7 +64,9 @@ class MHFormerInferencer(IKeypoints3DInferencer):
         # 2. TTA (Test-Time Augmentation): 构造翻转输入
         input_2d_aug = copy.deepcopy(input_2d)
         input_2d_aug[:, :, 0] *= -1  # X 轴反转
-        input_2d_aug[:, self.joints_left + self.joints_right] = input_2d_aug[:, self.joints_right + self.joints_left]
+        input_2d_aug[:, self.joints_left + self.joints_right] = input_2d_aug[
+            :, self.joints_right + self.joints_left
+        ]
 
         # 将正向和翻转堆叠成 Batch [2, Window, 17, 2]
         input_batch = np.stack([input_2d, input_2d_aug], axis=0)
@@ -74,8 +81,9 @@ class MHFormerInferencer(IKeypoints3DInferencer):
         out_flip = output_3d_tensor[1:2].clone()
 
         out_flip[:, :, :, 0] *= -1
-        out_flip[:, :, self.joints_left + self.joints_right,
-                 :] = out_flip[:, :, self.joints_right + self.joints_left, :]
+        out_flip[:, :, self.joints_left + self.joints_right, :] = out_flip[
+            :, :, self.joints_right + self.joints_left, :
+        ]
 
         out_3d = (out_non_flip + out_flip) / 2.0
         out_3d = out_3d.squeeze(0).cpu().numpy()  # [Window, 17, 3]
@@ -94,7 +102,6 @@ class MHFormerInferencer(IKeypoints3DInferencer):
         keypoints_2d: np.ndarray,
         video_width: int,
         video_height: int,
-        stride: int,
     ) -> np.ndarray:
         total_frames = keypoints_2d.shape[0]
         if total_frames == 0:
@@ -109,7 +116,7 @@ class MHFormerInferencer(IKeypoints3DInferencer):
         if total_frames <= self.window:
             pad_length = self.window - total_frames
             # 使用边缘填充策略补齐帧数
-            padded_2d = np.pad(kps_2d, ((0, pad_length), (0, 0), (0, 0)), mode='edge')
+            padded_2d = np.pad(kps_2d, ((0, pad_length), (0, 0), (0, 0)), mode="edge")
             pred_3d = self._infer_chunk(padded_2d, video_width, video_height)
 
             # 把地面拉平 (将每帧的最低点贴至 Z=0)
@@ -122,12 +129,14 @@ class MHFormerInferencer(IKeypoints3DInferencer):
         final_3d = np.zeros((total_frames, 17, 3), dtype=np.float32)
         weight_counts = np.zeros((total_frames, 1, 1), dtype=np.float32)
 
-        starts = list(range(0, total_frames - self.window + 1, stride))
+        starts = list(range(0, total_frames - self.window + 1, self.stride))
         # 防坑：确保最后几帧绝对被覆盖到
         if starts[-1] + self.window < total_frames:
             starts.append(total_frames - self.window)
 
-        print(f"🔄 启动 MHFormer 块级滑动推理: 总帧数 {total_frames}, 切分 {len(starts)} 块...")
+        print(
+            f"🔄 启动 MHFormer 块级滑动推理: 总帧数 {total_frames}, 切分 {len(starts)} 块..."
+        )
 
         for start in tqdm(starts, desc="MHFormer 3D 升维"):
             end = start + self.window

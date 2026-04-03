@@ -1,0 +1,9 @@
+[project]
+name = "yoyov8-benchmark"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.8.19"
+dependencies = [
+    "ultralytics>=8.4.33",
+]

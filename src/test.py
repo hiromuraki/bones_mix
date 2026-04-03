@@ -17,6 +17,7 @@ rtmpose = RTMPoseInferencer()
 mhformer = MHFormerInferencer(
     weight_path=Path("MHFormer/checkpoint/pretrained/351/model_4294.pth"),
     window=351,
+    stride=60,
 )
 motion_ag_former = MotionAGFormerInferencer(
     config_path=Path("MotionAGFormer/configs/h36m/MotionAGFormer-base.yaml"),
@@ -53,7 +54,6 @@ def test_inference_pipeline(video_name: str):
         kp_2d_h36m,
         video_width=video_size[0],
         video_height=video_size[1],
-        stride=351 // 2,
     )
     Serializer.save_keypoints_to_pickle(
         kp_3d_mhformer, out_dir / "3d_kp_rtmpose_to_mhformer.pkl"

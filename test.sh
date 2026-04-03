@@ -46,5 +46,10 @@ echo "$TEST_DATA_DIR"
 echo "$TEST_OUTPUT_DIR"
 
 cd "$base_dir/src" && uv run test.py
+if [ $? -ne 0 ]; then
+    echo "❌ src/test.py 执行失败，正在退出..."
+    exit 1
+fi
+
 cd "$base_dir/tools/video_renderer/src" && uv run test.py
 cd "$base_dir" && echo 处理完成
