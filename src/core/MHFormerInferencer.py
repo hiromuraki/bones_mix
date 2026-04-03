@@ -6,7 +6,7 @@ import argparse
 import torch
 from tqdm import tqdm
 from MHFormer.model.mhformer import Model
-from MHFormer.common.camera import normalize_screen_coordinates, camera_to_world
+from MHFormer.common.camera import normalize_screen_coordinates
 from .share import IKeypoints3DInferencer
 
 

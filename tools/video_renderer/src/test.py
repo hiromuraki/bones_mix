@@ -39,22 +39,22 @@ def render_video(video_name: str):
         load_keypoints(out_dir / "3d_kp_rtmpose_to_mhformer.pkl"),
         flip_x=True,
         flip_y=True,
-        output_video_path=out_dir / f"3d_kp_rtmpose_to_mhformer.mp4"
+        output_video_path=out_dir / "3d_kp_rtmpose_to_mhformer.mp4"
     )
 
     VideoRenderer.render_3d_keypoints(
         load_keypoints(out_dir / "3d_kp_rtmpose_to_motionagformer.pkl"),
         flip_x=True,
         flip_y=False,
-        output_video_path=out_dir / f"3d_kp_rtmpose_to_motionagformer.mp4"
+        output_video_path=out_dir / "3d_kp_rtmpose_to_motionagformer.mp4"
     )
 
     # 合并视频
     VideoJoiner.concat_videos(
         [
-            (out_dir / f"2d_kp_rtmpose_h36m.mp4", "2D (RTMPose)"),
-            (out_dir / f"3d_kp_rtmpose_to_mhformer.mp4", "3D (MHFormer)"),
-            (out_dir / f"3d_kp_rtmpose_to_motionagformer.mp4", "3D (MotionAGFormer)"),
+            (out_dir / "2d_kp_rtmpose_h36m.mp4", "2D (RTMPose)"),
+            (out_dir / "3d_kp_rtmpose_to_mhformer.mp4", "3D (MHFormer)"),
+            (out_dir / "3d_kp_rtmpose_to_motionagformer.mp4", "3D (MotionAGFormer)"),
         ],
         output_video_file=TEST_OUTPUT_DIR / f"{video_name}_output.mp4"
     )

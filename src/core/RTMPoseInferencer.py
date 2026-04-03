@@ -1,4 +1,5 @@
 import cv2
+import torch
 from tqdm import tqdm
 
 from .share import IKeypoints2DInferencer
@@ -13,6 +14,16 @@ class RTMPoseInferencer(IKeypoints2DInferencer):
     使用 MMPose 的 RTMPose-l 模型进行 2D 关键点检测，并输出统一格式的张量。
     输出形状为 [Persons, Frames, 17, 3]，格式为 COCO 的 17 点关键点，其中第三维为 (x, y, confidence)。
     """
+
+    def __init__(self, batch_size: int = 32, device: str = "cuda:0") -> None:
+        super().__init__()
+        self.batch_size = batch_size
+
+        if device.startswith("cuda") and not torch.cuda.is_available():
+            print("⚠️ CUDA 不可用，已自动切换到 CPU")
+            self.device = "cpu"
+        else:
+            self.device = device
 
     def run_2d_keypoints_inference(
         self,
@@ -31,11 +42,21 @@ class RTMPoseInferencer(IKeypoints2DInferencer):
         cap.release()
 
         print("正在初始化 RTMPose-l 和 RTMDet-m（首次运行可能需要下载权重）...")
-        inferencer = MMPoseInferencer(det_model="rtmdet-m", pose2d="rtmpose-l")
+        inferencer = MMPoseInferencer(
+            det_model="rtmdet-m",
+            pose2d="rtmpose-l",
+            device=self.device,
+        )
 
         print(f"开始提取 2D 关键点: {input_video} (共 {total_frames} 帧)")
         frame_predictions: List[List[Dict[str, np.ndarray]]] = []
-        result_generator = inferencer(str(input_video), show=False, return_vis=False, save_predictions=False)
+        result_generator = inferencer(
+            str(input_video),
+            show=False,
+            return_vis=False,
+            save_predictions=False,
+            batch_size=self.batch_size,
+        )
 
         # 🌟 替换：使用 tqdm 包装生成器，并传入 total_frames
         for result in tqdm(result_generator, total=total_frames, desc="RTMPose 提取中"):
@@ -68,18 +89,24 @@ class RTMPoseInferencer(IKeypoints2DInferencer):
                 # 取出 17x2 的坐标
                 kps = np.array(instance["keypoints"], dtype=np.float32)
                 # 取出 17 维的置信度，若由于某种原因缺失，默认给 1.0
-                scores = np.array(instance.get("keypoint_scores", np.ones(17)), dtype=np.float32)
+                scores = np.array(
+                    instance.get("keypoint_scores", np.ones(17)), dtype=np.float32
+                )
 
                 # 合并到输出张量的对应切片中
                 output_tensor[person_idx, frame_idx, :, :2] = kps
                 output_tensor[person_idx, frame_idx, :, 2] = scores
 
-        print(f"✅ 张量重构完成！最终形状为: {output_tensor.shape} (Persons, Frames, Joints, Channels)")
+        print(
+            f"✅ 张量重构完成！最终形状为: {output_tensor.shape} (Persons, Frames, Joints, Channels)"
+        )
 
         return output_tensor
 
     @classmethod
-    def __build_instances(cls, keypoints: Any, keypoint_scores: Any = None) -> List[Dict[str, np.ndarray]]:
+    def __build_instances(
+        cls, keypoints: Any, keypoint_scores: Any = None
+    ) -> List[Dict[str, np.ndarray]]:
         keypoints_array = np.asarray(keypoints, dtype=np.float32)
         if keypoints_array.ndim == 2:
             keypoints_array = keypoints_array[None, ...]
@@ -107,7 +134,9 @@ class RTMPoseInferencer(IKeypoints2DInferencer):
 
         if isinstance(prediction, dict):
             if "keypoints" in prediction:
-                return cls.__build_instances(prediction["keypoints"], prediction.get("keypoint_scores"))
+                return cls.__build_instances(
+                    prediction["keypoints"], prediction.get("keypoint_scores")
+                )
 
             if "predictions" in prediction:
                 return cls.__extract_instances(prediction["predictions"])
