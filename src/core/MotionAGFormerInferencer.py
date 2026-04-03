@@ -131,7 +131,7 @@ class MotionAGFormerInferencer(IKeypoints3DInferencer):
         try:
             model.load_state_dict(clean_state_dict, strict=True)
             print("✅ 权重完美加载 (Strict Mode)！")
-        except RuntimeError as e:
+        except RuntimeError:
             print("⚠️ 严格模式加载失败，尝试忽略差异项加载...")
             # non-strict 允许你忽略某些微小差异（通常不影响运行）
             model.load_state_dict(clean_state_dict, strict=False)
@@ -154,8 +154,6 @@ class MotionAGFormerInferencer(IKeypoints3DInferencer):
         输出: [243, 17, 3] 形状的 3D 关键点
         """
         device = next(model.parameters()).device
-
-        frame_count = keypoints_2d.shape[0]
 
         # ==========================================
         # 步骤 1: 坐标归一化 (还原论文的处理手法)
